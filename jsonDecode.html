@@ -1,0 +1,419 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Cleaner & Prettifier</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        h1 {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .editor-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .editor-box {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            width: 100%;
+        }
+        
+        .editor-box h2 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 400px;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: vertical;
+            transition: border-color 0.3s;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        #output {
+            background-color: #f8f9fa;
+        }
+        
+        .button-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 40px;
+            font-size: 16px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin: 0 10px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .status {
+            text-align: center;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-weight: bold;
+            display: none;
+        }
+        
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+        
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+        
+        .features {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+        
+        .features h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .features ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .features li {
+            padding: 5px 0;
+            color: #666;
+        }
+        
+        .features li:before {
+            content: "✓ ";
+            color: #667eea;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 10px;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            button {
+                padding: 10px 20px;
+                font-size: 14px;
+                margin: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 JSON Cleaner & Prettifier</h1>
+        <div class="button-container">
+            <button onclick="cleanAndPrettify()">🔧 Clean & Prettify</button>
+            <button onclick="copyToClipboard()">📋 Copy Output</button>
+            <button onclick="clearAll()">🗑️ Clear All</button>
+        </div>
+        
+        <div class="editor-container">
+            <div class="editor-box">
+                <h2>Input JSON</h2>
+                <textarea id="input" placeholder="Paste your JSON here..."></textarea>
+            </div>
+            
+            <div class="editor-box">
+                <h2>Cleaned & Prettified Output</h2>
+                <textarea id="output" readonly placeholder="Cleaned JSON will appear here..."></textarea>
+                <div id="status" class="status"></div>
+            </div>
+        </div>
+        <div class="features">
+            <h3>Features:</h3>
+            <ul>
+                <li>Extracts first JSON object from multi-JSON inputs</li>
+                <li>Handles special separators (0x1e, 0x1f, etc.) between JSON objects</li>
+                <li>Removes non-standard characters automatically</li>
+                <li>Formats JSON with proper indentation for readability</li>
+                <li>Recursively parses stringified JSON values</li>
+                <li>Validates JSON syntax and shows errors</li>
+                <li>Copy formatted JSON to clipboard</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        function cleanAndPrettify() {
+            const input = document.getElementById('input').value;
+            const output = document.getElementById('output');
+            const status = document.getElementById('status');
+            
+            if (!input.trim()) {
+                showStatus('Please enter some JSON text', 'error');
+                return;
+            }
+            
+            try {
+                // Step 1: Extract first JSON object if multiple are present
+                let cleanedText = extractFirstJSON(input);
+                
+                // Step 2: Remove remaining non-standard characters
+                // Remove zero-width characters, control characters, and clean up whitespace
+                cleanedText = cleanedText
+                    .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters (but preserve separators we already handled)
+                    .replace(/[\u200B-\u200D\uFEFF]/g, '') // Remove zero-width characters
+                    .replace(/[\u2028\u2029]/g, '') // Remove line/paragraph separators
+                    .replace(/\r\n/g, '\n') // Normalize line endings
+                    .replace(/\r/g, '\n')
+                    .trim();
+                
+                // Step 3: Parse the JSON
+                let parsedJSON = JSON.parse(cleanedText);
+                
+                // Step 4: Recursively check for stringified JSON values
+                parsedJSON = deepParseJSON(parsedJSON);
+                
+                // Step 5: Pretty print the JSON
+                const prettyJSON = JSON.stringify(parsedJSON, null, 2);
+                
+                output.value = prettyJSON;
+                showStatus('JSON cleaned and prettified successfully!', 'success');
+                
+            } catch (error) {
+                // Try to fix common JSON errors
+                try {
+                    let extractedText = extractFirstJSON(input);
+                    let fixedJSON = attemptJSONFix(extractedText);
+                    let parsedJSON = JSON.parse(fixedJSON);
+                    parsedJSON = deepParseJSON(parsedJSON);
+                    const prettyJSON = JSON.stringify(parsedJSON, null, 2);
+                    output.value = prettyJSON;
+                    showStatus('JSON fixed and prettified successfully!', 'success');
+                } catch (fixError) {
+                    output.value = '';
+                    showStatus(`Error: ${error.message}`, 'error');
+                }
+            }
+        }
+        
+        function extractFirstJSON(text) {
+            // Common JSON separators (including the example <0x1e>)
+            const separators = [
+                '\x1e',     // Record separator (0x1e)
+                '\x1f',     // Unit separator (0x1f)
+                '\x00',     // Null character
+                '\x01',     // Start of heading
+                '\x02',     // Start of text
+                '\x03',     // End of text
+                '\x04',     // End of transmission
+                '}{',       // Direct concatenation of JSON objects
+                ']\n{',     // Array followed by object
+                '}\n{',     // Object followed by object
+                '}\r\n{',   // Object followed by object (Windows line endings)
+                '}\r{',     // Object followed by object (Mac line endings)
+            ];
+            
+            let firstSeparatorIndex = -1;
+            let foundSeparator = '';
+            
+            // Find the earliest separator
+            for (const separator of separators) {
+                const index = text.indexOf(separator);
+                if (index !== -1 && (firstSeparatorIndex === -1 || index < firstSeparatorIndex)) {
+                    firstSeparatorIndex = index;
+                    foundSeparator = separator;
+                }
+            }
+            
+            // If no separator found, return original text
+            if (firstSeparatorIndex === -1) {
+                return text;
+            }
+            
+            // Handle special case for }{ - we want to keep the closing brace
+            if (foundSeparator === '}{') {
+                return text.substring(0, firstSeparatorIndex + 1);
+            }
+            
+            // Handle cases where separator includes newlines and braces
+            if (foundSeparator.includes('}') && foundSeparator.includes('{')) {
+                const braceIndex = foundSeparator.indexOf('}');
+                return text.substring(0, firstSeparatorIndex + braceIndex + 1);
+            }
+            
+            // For other separators, extract everything before the separator
+            return text.substring(0, firstSeparatorIndex);
+        }
+        
+        function deepParseJSON(obj) {
+            if (obj === null || obj === undefined) {
+                return obj;
+            }
+            
+            if (typeof obj === 'string') {
+                // Try to parse string as JSON
+                try {
+                    const parsed = JSON.parse(obj);
+                    // Recursively parse the result
+                    return deepParseJSON(parsed);
+                } catch (e) {
+                    // If it's not valid JSON, return the original string
+                    return obj;
+                }
+            }
+            
+            if (Array.isArray(obj)) {
+                return obj.map(item => deepParseJSON(item));
+            }
+            
+            if (typeof obj === 'object') {
+                const result = {};
+                for (const key in obj) {
+                    if (obj.hasOwnProperty(key)) {
+                        result[key] = deepParseJSON(obj[key]);
+                    }
+                }
+                return result;
+            }
+            
+            return obj;
+        }
+        
+        function attemptJSONFix(text) {
+            // Remove non-standard characters first
+            let fixed = text
+                .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+                .replace(/[\u200B-\u200D\uFEFF]/g, '')
+                .replace(/[\u2028\u2029]/g, '')
+                .trim();
+            
+            // Fix common JSON issues
+            // Add quotes to unquoted keys
+            fixed = fixed.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":');
+            
+            // Fix single quotes to double quotes
+            fixed = fixed.replace(/'/g, '"');
+            
+            // Remove trailing commas
+            fixed = fixed.replace(/,\s*}/g, '}');
+            fixed = fixed.replace(/,\s*]/g, ']');
+            
+            return fixed;
+        }
+        
+        function copyToClipboard() {
+            const output = document.getElementById('output');
+            if (!output.value) {
+                showStatus('Nothing to copy!', 'error');
+                return;
+            }
+            
+            output.select();
+            output.setSelectionRange(0, 99999); // For mobile devices
+            
+            try {
+                document.execCommand('copy');
+                showStatus('Copied to clipboard!', 'success');
+            } catch (err) {
+                showStatus('Failed to copy!', 'error');
+            }
+        }
+        
+        function clearAll() {
+            document.getElementById('input').value = '';
+            document.getElementById('output').value = '';
+            document.getElementById('status').style.display = 'none';
+        }
+        
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = 'status ' + type;
+            
+            setTimeout(() => {
+                status.style.display = 'none';
+            }, 3000);
+        }
+        
+        // Add keyboard shortcut (Ctrl/Cmd + Enter to prettify)
+        document.getElementById('input').addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                cleanAndPrettify();
+            }
+        });
+        
+        // Auto-prettify when content is pasted
+        document.getElementById('input').addEventListener('paste', function(e) {
+            // Use setTimeout to allow the paste operation to complete first
+            setTimeout(function() {
+                cleanAndPrettify();
+            }, 100);
+        });
+    </script>
+</body>
+</html>
